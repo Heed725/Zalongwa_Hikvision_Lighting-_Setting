@@ -60,3 +60,7 @@ Turning the light off can reduce face-recognition performance in dark conditions
 ## Automatic-restore note
 
 Automatic restoration uses a background timer in the running Streamlit server. Keep the deployment awake during the selected period. The immediate restore button and downloaded backup XML remain available as fallbacks if the hosting service restarts or sleeps.
+
+## DS-K1T321 supplementary-light schema
+
+The Zalongwa face terminal uses the access-terminal fields `mode` and `brightnessLimit`. Temporary shutoff sets `mode` to `off` and `brightnessLimit` to `0`, then restores the exact original XML when the timer ends. The app also provides a raw configuration download for diagnostics.
