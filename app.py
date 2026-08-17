@@ -61,10 +61,12 @@ def show_configuration(values: dict[str, str]) -> None:
         for key, value in values.items()
         if key
         in {
+            "mode",
             "enabled",
             "supplementLightMode",
             "mixedLightBrightnessRegulatMode",
             "brightnessRegulateMode",
+            "brightnessLimit",
             "whiteLightBrightness",
             "brightness",
             "maxBrightness",
@@ -133,6 +135,7 @@ if st.button("Read current light settings", use_container_width=True):
             current = light_client.get_configuration()
         st.session_state.light_endpoint = current.endpoint
         st.session_state.light_values = current.values
+        st.session_state.light_current_xml = current.xml
         st.success("Current supplementary-light settings loaded.")
     except LightControlError as exc:
         st.error(str(exc))
@@ -140,6 +143,14 @@ if st.button("Read current light settings", use_container_width=True):
 if st.session_state.get("light_endpoint"):
     st.caption(f"Detected endpoint: {escape(st.session_state.light_endpoint)}")
     show_configuration(st.session_state.get("light_values", {}))
+    if st.session_state.get("light_current_xml"):
+        st.download_button(
+            "Download current raw light configuration",
+            data=st.session_state.light_current_xml,
+            file_name="zalongwa-current-light-settings.xml",
+            mime="application/xml",
+            use_container_width=True,
+        )
 
 st.divider()
 st.subheader("Temporary light shutoff")
