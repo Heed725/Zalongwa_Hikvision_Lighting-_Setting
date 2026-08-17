@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+import threading
+from datetime import datetime, timedelta
 from html import escape
 
 import streamlit as st
@@ -39,6 +41,18 @@ def client() -> HikvisionLightClient:
         int(setting("HIKVISION_TIMEOUT", "45")),
         setting("HIKVISION_VERIFY_TLS", "false").lower() == "true",
     )
+
+
+def restore_after_delay(
+    light_client: HikvisionLightClient,
+    endpoint: str,
+    backup_xml: bytes,
+) -> None:
+    try:
+        light_client.put_configuration(endpoint, backup_xml)
+    except Exception:
+        # The manual restore button and downloaded XML remain the safe fallback.
+        pass
 
 
 def show_configuration(values: dict[str, str]) -> None:
@@ -128,10 +142,17 @@ if st.session_state.get("light_endpoint"):
     show_configuration(st.session_state.get("light_values", {}))
 
 st.divider()
-st.subheader("Turn light off")
+st.subheader("Temporary light shutoff")
+
+off_minutes = st.selectbox(
+    "Automatically turn the light back on after",
+    options=[1, 5, 10, 15, 30, 60],
+    index=2,
+    format_func=lambda minutes: f"{minutes} minute" if minutes == 1 else f"{minutes} minutes",
+)
 
 if st.button(
-    "Turn supplementary light off",
+    "Turn light off temporarily",
     type="primary",
     use_container_width=True,
 ):
@@ -139,17 +160,36 @@ if st.button(
         with st.spinner("Saving current settings and switching the light off…"):
             backup = light_client.turn_off()
             current = light_client.get_configuration()
+
+        old_timer = st.session_state.get("light_restore_timer")
+        if old_timer is not None:
+            old_timer.cancel()
+
+        timer = threading.Timer(
+            off_minutes * 60,
+            restore_after_delay,
+            args=(light_client, backup.endpoint, backup.xml),
+        )
+        timer.daemon = True
+        timer.start()
+
+        st.session_state.light_restore_timer = timer
         st.session_state.light_backup_xml = backup.xml
         st.session_state.light_endpoint = current.endpoint
         st.session_state.light_values = current.values
+        st.session_state.light_restore_at = datetime.now() + timedelta(minutes=off_minutes)
         st.success(
-            "Supplementary light switched off. Download the backup before leaving."
+            f"Supplementary light switched off. It is scheduled to return automatically "
+            f"at {st.session_state.light_restore_at.strftime('%H:%M:%S')}."
         )
     except LightControlError as exc:
         st.error(str(exc))
 
 backup_xml = st.session_state.get("light_backup_xml")
 if backup_xml:
+    restore_at = st.session_state.get("light_restore_at")
+    if restore_at:
+        st.info(f"Automatic restoration scheduled for {restore_at.strftime('%H:%M:%S')}.")
     st.download_button(
         "Download previous light settings",
         data=backup_xml,
@@ -157,6 +197,20 @@ if backup_xml:
         mime="application/xml",
         use_container_width=True,
     )
+
+    if st.button("Turn light back on now", use_container_width=True):
+        try:
+            with st.spinner("Restoring the previous light settings…"):
+                restored = light_client.restore(backup_xml)
+            timer = st.session_state.pop("light_restore_timer", None)
+            if timer is not None:
+                timer.cancel()
+            st.session_state.pop("light_restore_at", None)
+            st.session_state.light_endpoint = restored.endpoint
+            st.session_state.light_values = restored.values
+            st.success("The supplementary light was restored immediately.")
+        except LightControlError as exc:
+            st.error(str(exc))
 
 st.divider()
 st.subheader("Restore normal/previous settings")
@@ -174,6 +228,10 @@ if st.button(
     try:
         with st.spinner("Restoring the saved supplementary-light configuration…"):
             restored = light_client.restore(restore_xml)
+        timer = st.session_state.pop("light_restore_timer", None)
+        if timer is not None:
+            timer.cancel()
+        st.session_state.pop("light_restore_at", None)
         st.session_state.light_endpoint = restored.endpoint
         st.session_state.light_values = restored.values
         st.success("The exact previous supplementary-light settings were restored.")
