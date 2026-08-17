@@ -118,10 +118,15 @@ class HikvisionLightClient:
         changed = []
         for node in root.iter():
             name = _local_name(node.tag)
-            if name == "enabled":
+            if name == "mode":
+                # Face-recognition terminals use: schedule, off, on, auto, manual.
+                node.text = "off"
+                changed.append(name)
+            elif name == "enabled":
                 node.text = "false"
                 changed.append(name)
             elif name in {
+                "brightnessLimit",
                 "whiteLightBrightness",
                 "brightness",
                 "maxBrightness",
