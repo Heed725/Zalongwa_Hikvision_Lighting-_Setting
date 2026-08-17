@@ -7,7 +7,9 @@ A protected Streamlit administrator app for remotely checking, switching off, an
 - Detects the supported Hikvision ISAPI supplementary-light endpoint.
 - Displays the current light configuration.
 - Saves the terminal's exact current XML configuration before changing anything.
-- Turns off supported light/brightness fields.
+- Turns off supported light/brightness fields for a selected duration.
+- Automatically restores the exact previous settings after 1, 5, 10, 15, 30, or 60 minutes.
+- Provides a **Turn light back on now** button.
 - Downloads a backup XML for safe storage.
 - Restores the exact previous configuration from the current session or an uploaded backup.
 - Requires a separate administrator PIN.
@@ -37,9 +39,9 @@ Never commit real credentials. The device must be reachable from Streamlit Cloud
 
 1. Sign in with the separate light-control PIN.
 2. Click **Read current light settings**.
-3. Click **Turn supplementary light off**.
+3. Choose how long the light should remain off and click **Turn light off temporarily**.
 4. Download and keep the generated `zalongwa-light-backup.xml`.
-5. To return to normal, click **Restore previous settings** while the backup remains in the session, or upload the saved XML and restore it.
+5. The app automatically restores the previous settings when the timer ends. To restore sooner, click **Turn light back on now**. You can also upload the saved XML after a restart.
 
 The app restores the exact saved configuration instead of guessing brightness or automatic-mode defaults.
 
@@ -54,3 +56,7 @@ streamlit run app.py
 ```
 
 Turning the light off can reduce face-recognition performance in dark conditions.
+
+## Automatic-restore note
+
+Automatic restoration uses a background timer in the running Streamlit server. Keep the deployment awake during the selected period. The immediate restore button and downloaded backup XML remain available as fallbacks if the hosting service restarts or sleeps.
